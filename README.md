@@ -17,7 +17,9 @@ a separate read-only web frontend both show live account state, holdings and act
   read-only FastAPI layer (`api.py`) for the decoupled frontend.
 - **`demo/`** — a Gradio dashboard that reads `accounts.db` in-process.
 - **`frontend/`** — a small TypeScript/Vite app that polls `backend/api.py` over HTTP instead.
-- **`1_lab1.ipynb`–`5_lab5.ipynb`** — the original course notebooks that build up to this app.
+- **`5_lab5.ipynb`** — a notebook that exercises `backend.api` directly; kept around for ad hoc
+  exploration. The other four course notebooks (unrelated MCP experiments that predate this app)
+  were dropped — they live on in the original tutorial repo.
 
 ## Market data
 
