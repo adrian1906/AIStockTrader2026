@@ -7,8 +7,12 @@ original design goes to Ed; this fork carries local modifications on top of it.
 
 Four autonomous LLM trading agents — Warren, George, Ray and Cathie, each modelled after a different
 real-world investing style — run on a schedule, research the market via an MCP-tool-equipped
-researcher sub-agent, and place simulated trades against a paper-money account. A Gradio dashboard and
-a separate read-only web frontend both show live account state, holdings and activity logs.
+researcher sub-agent, and place simulated trades against a paper-money account.
+
+The trading engine (`backend/trading_floor.py`) is a separate, long-running process from the two
+dashboards that display its results. A Gradio dashboard and a decoupled TypeScript/Vite frontend
+both read the same `accounts.db` read-only - **neither one runs the agents**; the engine has to be
+started on its own for the numbers to actually move.
 
 ## Architecture
 
@@ -65,16 +69,40 @@ report built on fabricated data.
    python -m backend.reset
    ```
 
-4. Run it:
+4. Start the trading engine (its own process, runs every `RUN_EVERY_N_MINUTES`):
 
    ```bash
-   # Gradio dashboard (starts the trading floor + UI together)
+   python -m backend.trading_floor
+   ```
+
+5. Run a dashboard to watch it - either works, pick one:
+
+   ```bash
+   # Gradio dashboard
    python app.py
 
-   # or, for the decoupled frontend:
-   uv run uvicorn backend.api:app --port 8000   # from a shell with the backend deps installed
-   cd frontend && npm run dev
+   # or the decoupled frontend, for local dev (hot reload, proxies /api to :8000):
+   uvicorn backend.api:app --port 8000
+   cd frontend && npm run dev   # opens on :5173
    ```
 
 `accounts.db` is created on first run and is gitignored — it's local paper-trading state, not
 something to commit.
+
+## Running the frontend as a single origin (for a tunnel/remote demo)
+
+For anything other than local dev, build the frontend once and let `backend/api.py` serve it
+directly - one process, one port, no CORS, and only one hostname to expose:
+
+```bash
+cd frontend && npm run build   # writes frontend/dist/
+cd ..
+uvicorn backend.api:app --host 127.0.0.1 --port 8000
+```
+
+`backend/api.py` auto-detects `frontend/dist/` and mounts it at `/`, alongside the existing
+`/api/*` routes, whenever that directory exists. Rebuild (`npm run build`) after any frontend
+change; the mount just serves whatever is currently in `dist/`.
+
+To actually reach it from outside your machine, put a tunnel (e.g. Cloudflare Tunnel) in front of
+`http://127.0.0.1:8000` rather than binding the server to a public interface directly.

@@ -4,12 +4,19 @@ The Gradio dashboard in demo/ reads accounts.db in-process. This serves the same
 data as JSON so a decoupled web frontend can render it. Everything here is
 read-only; the trading floor writes the database out of band.
 
-Run it from the 6_mcp directory so it shares the engine's accounts.db:
+Run it from the project root so it shares the engine's accounts.db:
 
-    uv run uvicorn backend.api:app --port 8000
+    uvicorn backend.api:app --port 8000
+
+If frontend/dist exists (built with `npm run build`), it's served from this same
+process at "/" - one process, one port, no CORS - which is what you want for a
+single tunnelled origin rather than juggling the Vite dev server separately.
 """
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from backend import market
 from backend.accounts import Account
@@ -131,3 +138,11 @@ def get_trader_logs(name: str, last_n: int = 13) -> list[dict]:
         {"datetime": ts, "type": kind, "message": message, "color": LOG_COLORS.get(kind, DEFAULT_LOG_COLOR)}
         for ts, kind, message in rows
     ]
+
+
+# Registered last so it never shadows the /api/* routes above - StaticFiles(html=True)
+# serves index.html for "/" and falls back to it for unknown paths, which is fine
+# since this is a single-page dashboard with no client-side routes to miss.
+_frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="frontend")
