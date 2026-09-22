@@ -1,0 +1,12 @@
+fastapi>=0.135
+uvicorn>=0.41
+gradio>=6.2
+pandas>=2.3
+plotly>=7.0
+pydantic>=2.12
+python-dotenv>=1.1
+mcp>=1.25
+massive>=2.8
+openai-agents>=0.6
+openai>=2.26
+requests>=2.32
