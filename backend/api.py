@@ -16,6 +16,7 @@ single tunnelled origin rather than juggling the Vite dev server separately.
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend import market
@@ -106,8 +107,7 @@ def get_market() -> dict:
     return {"source": source, "is_market_open": market.is_market_open()}
 
 
-@app.get("/api/traders/{name}")
-def get_trader(name: str) -> dict:
+def trader_state(name: str) -> dict:
     """A trader's full state: value, profit, holdings, transactions and history."""
     trader = require_trader(name)
     account = Account.get(name)
@@ -127,6 +127,64 @@ def get_trader(name: str) -> dict:
         "transactions": account.list_transactions(),
         "time_series": [{"datetime": ts, "value": value} for ts, value in account.portfolio_value_time_series],
     }
+
+
+@app.get("/api/traders/{name}")
+def get_trader(name: str) -> dict:
+    """A trader's full state: value, profit, holdings, transactions and history."""
+    return trader_state(name)
+
+
+def _money(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    sign = "-" if value < 0 else ""
+    return f"{sign}${abs(value):,.2f}"
+
+
+def trader_report_markdown(name: str) -> str:
+    """Render a trader's state as a human-readable Markdown report."""
+    state = trader_state(name)
+    lines = [
+        f"# {state['name']} {state['lastname']} ({state['model_name']})",
+        "",
+        f"- **Balance:** {_money(state['balance'])}",
+        f"- **Portfolio value:** {_money(state['portfolio_value'])}",
+        f"- **P&L:** {_money(state['pnl'])}",
+        f"- **Strategy:** {state['strategy']}",
+        "",
+        "## Holdings",
+    ]
+    if state["holdings"]:
+        lines.append("| Symbol | Qty | Price | Avg Cost | Market Value | Unrealized P&L |")
+        lines.append("|---|---|---|---|---|---|")
+        for h in state["holdings"]:
+            lines.append(
+                f"| {h['symbol']} | {h['quantity']} | {_money(h['price'])} | {_money(h['avg_cost'])} "
+                f"| {_money(h['market_value'])} | {_money(h['unrealized_pnl'])} |"
+            )
+    else:
+        lines.append("_No current holdings._")
+
+    lines += ["", "## Recent Transactions"]
+    transactions = state["transactions"][-10:]
+    if transactions:
+        for t in reversed(transactions):
+            side = "BUY" if t["quantity"] > 0 else "SELL"
+            lines.append(
+                f"- `{t['timestamp']}` **{side}** {abs(t['quantity'])} {t['symbol']} @ {_money(t['price'])}"
+                f" — {t['rationale']}"
+            )
+    else:
+        lines.append("_No transactions yet._")
+
+    return "\n".join(lines) + "\n"
+
+
+@app.get("/api/traders/{name}/report", response_class=PlainTextResponse)
+def get_trader_report(name: str) -> str:
+    """The same data as /api/traders/{name}, rendered as a Markdown report for humans."""
+    return trader_report_markdown(name)
 
 
 @app.get("/api/traders/{name}/logs")
