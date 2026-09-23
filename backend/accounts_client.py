@@ -26,8 +26,8 @@ if sys.platform.startswith("win"):
         pass
 
 params = StdioServerParameters(
-    command="uv",
-    args=["run", "-m", "backend.accounts_server"],
+    command=sys.executable,
+    args=["-m", "backend.accounts_server"],
     cwd=str(Path(__file__).resolve().parent.parent),
     env=None,
 )

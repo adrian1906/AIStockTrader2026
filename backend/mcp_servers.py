@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from agents.mcp import MCPServerStdio, create_static_tool_filter
@@ -24,14 +25,14 @@ if massive_api_key:
         "env": {"MASSIVE_API_KEY": massive_api_key},
     }
 else:
-    market_params = {"command": "uv", "args": ["run", "-m", "backend.market_server"], "cwd": PROJECT_DIR}
+    market_params = {"command": sys.executable, "args": ["-m", "backend.market_server"], "cwd": PROJECT_DIR}
 
 
 def trader_mcp_servers() -> list[MCPServerStdio]:
     """The trader's MCP servers: our Accounts server, Push Notification and Market data."""
     params = [
-        {"command": "uv", "args": ["run", "-m", "backend.accounts_server"], "cwd": PROJECT_DIR},
-        {"command": "uv", "args": ["run", "-m", "backend.push_server"], "cwd": PROJECT_DIR},
+        {"command": sys.executable, "args": ["-m", "backend.accounts_server"], "cwd": PROJECT_DIR},
+        {"command": sys.executable, "args": ["-m", "backend.push_server"], "cwd": PROJECT_DIR},
         market_params,
     ]
     return [MCPServerStdio(p, client_session_timeout_seconds=TIMEOUT) for p in params]
