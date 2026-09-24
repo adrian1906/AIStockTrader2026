@@ -70,7 +70,7 @@ async def run_every_n_minutes():
         else:
             print("Market is closed, skipping run")
         for slot in _due_digest_slots(last_digest_sent):
-            compile_and_store_digest(slot)
+            await compile_and_store_digest(slot)
             last_digest_sent[slot] = datetime.now().strftime("%Y-%m-%d")
         await asyncio.sleep(RUN_EVERY_N_MINUTES * 60)
 
