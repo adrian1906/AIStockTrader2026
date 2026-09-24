@@ -102,7 +102,7 @@ class Account(BaseModel):
 
     def sell_shares(self, symbol: str, quantity: int, rationale: str) -> str:
         """ Sell shares of a stock if the user has enough shares. """
-        if self.holdings.get(symbol, 0) < quantity:
+        if quantity <= 0 or self.holdings.get(symbol, 0) < quantity:
             raise ValueError(f"Cannot sell {quantity} shares of {symbol}. Not enough shares held.")
         
         price = get_share_price(symbol)
