@@ -131,6 +131,22 @@ def read_latest_digest(name: str) -> dict | None:
         return {"datetime": row[0], "slot": row[1], "report": row[2]} if row else None
 
 
+def read_digests_since(name: str, since: str) -> list[dict]:
+    """Every compiled digest for this trader at or after the given 'YYYY-MM-DD HH:MM:SS'
+
+    timestamp, oldest first - for pulling a range (e.g. the past week) rather than just
+    the latest one.
+    """
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT datetime, slot, report FROM digests
+            WHERE name = ? AND datetime >= ?
+            ORDER BY datetime ASC
+        ''', (name.lower(), since))
+        return [{"datetime": row[0], "slot": row[1], "report": row[2]} for row in cursor.fetchall()]
+
+
 def read_log(name: str, last_n=10):
     """
     Read the most recent log entries for a given name.

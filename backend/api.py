@@ -13,6 +13,7 @@ process at "/" - one process, one port, no CORS - which is what you want for a
 single tunnelled origin rather than juggling the Vite dev server separately.
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -21,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend import market
 from backend.accounts import Account
-from backend.database import read_latest_digest, read_log
+from backend.database import read_digests_since, read_latest_digest, read_log
 from backend.trading_floor import DIGEST_TIMES, names, lastnames, short_model_names
 
 # Mirrors the log colours in demo/ so the frontend reproduces the same panel.
@@ -202,6 +203,23 @@ def get_trader_digest(name: str) -> str:
             f"{', '.join(DIGEST_TIMES)} (local time on the machine running the scheduler)._\n"
         )
     return f"_Compiled {digest['datetime']} ({digest['slot']} slot)_\n\n{digest['report']}"
+
+
+@app.get("/api/traders/{name}/digests", response_class=PlainTextResponse)
+def get_trader_digests(name: str, days: int = 7) -> str:
+    """Every digest compiled for this trader in the last `days` days, oldest first,
+
+    concatenated into one document - e.g. days=7 for a week's worth of reports read as a whole.
+    """
+    require_trader(name)
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    digests = read_digests_since(name, since)
+    if not digests:
+        return f"# {name} — digests, last {days} day(s)\n\n_No digests compiled in this period._\n"
+    parts = [f"# {name} — digests, last {days} day(s)\n"]
+    for digest in digests:
+        parts.append(f"## {digest['datetime']} ({digest['slot']} slot)\n\n{digest['report']}")
+    return "\n\n---\n\n".join(parts)
 
 
 @app.get("/api/traders/{name}/logs")
