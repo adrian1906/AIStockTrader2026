@@ -21,9 +21,11 @@ started on its own for the numbers to actually move.
   read-only FastAPI layer (`api.py`) for the decoupled frontend.
 - **`demo/`** — a Gradio dashboard that reads `accounts.db` in-process.
 - **`frontend/`** — a small TypeScript/Vite app that polls `backend/api.py` over HTTP instead.
+- **`1_lab1.ipynb`** through **`4_lab4.ipynb`** — exploratory MCP experiments (Playwright, Context7,
+  a memory/vector-db demo) from the original course, unrelated to this app and not imported by
+  anything here; kept for reference.
 - **`5_lab5.ipynb`** — a notebook that exercises `backend.api` directly; kept around for ad hoc
-  exploration. The other four course notebooks (unrelated MCP experiments that predate this app)
-  were dropped — they live on in the original tutorial repo.
+  exploration.
 
 ## Market data
 
