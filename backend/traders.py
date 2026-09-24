@@ -1,7 +1,9 @@
 from contextlib import AsyncExitStack
 from .accounts_client import read_accounts_resource, read_strategy_resource
+from .database import write_session
 from .tracers import make_trace_id
-from agents import Agent, Tool, Runner, OpenAIChatCompletionsModel, trace
+from agents import Agent, ItemHelpers, Tool, Runner, OpenAIChatCompletionsModel, trace
+from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
@@ -14,6 +16,39 @@ from .templates import (
     research_tool,
 )
 from .mcp_servers import trader_mcp_servers, researcher_mcp_servers
+
+NARRATIVE_STEP_CHARS = 1500
+
+
+def _summarize(output) -> str:
+    text = output if isinstance(output, str) else json.dumps(output, default=str)
+    text = text.strip()
+    if len(text) > NARRATIVE_STEP_CHARS:
+        text = text[:NARRATIVE_STEP_CHARS] + "... (truncated)"
+    return text
+
+
+def record_session(name: str, kind: str, result) -> None:
+    """Turn one Runner.run() result into a step-by-step narrative for the digest:
+
+    every tool consulted (with its arguments), what it returned, and every message
+    the model produced - including the Researcher sub-agent's own findings, since
+    it's called as a tool and its output is its full synthesized answer.
+    """
+    steps = []
+    for item in result.new_items:
+        if isinstance(item, ToolCallItem):
+            raw = item.raw_item
+            tool_name = getattr(raw, "name", None)
+            if tool_name:
+                steps.append({"type": "tool_call", "tool": tool_name, "args": getattr(raw, "arguments", "")})
+        elif isinstance(item, ToolCallOutputItem):
+            steps.append({"type": "tool_output", "output": _summarize(item.output)})
+        elif isinstance(item, MessageOutputItem):
+            text = ItemHelpers.text_message_output(item).strip()
+            if text:
+                steps.append({"type": "message", "text": text})
+    write_session(name, kind, steps)
 
 load_dotenv(override=True)
 
@@ -97,7 +132,8 @@ class Trader:
             if self.do_trade
             else rebalance_message(self.name, strategy, account)
         )
-        await Runner.run(self.agent, message, max_turns=MAX_TURNS)
+        result = await Runner.run(self.agent, message, max_turns=MAX_TURNS)
+        record_session(self.name, "trade" if self.do_trade else "rebalance", result)
 
     async def run_with_mcp_servers(self):
         async with AsyncExitStack() as stack:

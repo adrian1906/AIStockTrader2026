@@ -21,8 +21,8 @@ from fastapi.staticfiles import StaticFiles
 
 from backend import market
 from backend.accounts import Account
-from backend.database import read_log
-from backend.trading_floor import names, lastnames, short_model_names
+from backend.database import read_latest_digest, read_log
+from backend.trading_floor import DIGEST_TIMES, names, lastnames, short_model_names
 
 # Mirrors the log colours in demo/ so the frontend reproduces the same panel.
 LOG_COLORS = {
@@ -185,6 +185,23 @@ def trader_report_markdown(name: str) -> str:
 def get_trader_report(name: str) -> str:
     """The same data as /api/traders/{name}, rendered as a Markdown report for humans."""
     return trader_report_markdown(name)
+
+
+@app.get("/api/traders/{name}/digest", response_class=PlainTextResponse)
+def get_trader_digest(name: str) -> str:
+    """The most recently compiled process digest for this trader (Markdown): what it
+
+    researched, how it read it, and what it decided - compiled a couple of times a day
+    (see DIGEST_TIMES) rather than after every round.
+    """
+    require_trader(name)
+    digest = read_latest_digest(name)
+    if not digest:
+        return (
+            f"# {name}\n\n_No digest compiled yet. Digests are compiled at: "
+            f"{', '.join(DIGEST_TIMES)} (local time on the machine running the scheduler)._\n"
+        )
+    return f"_Compiled {digest['datetime']} ({digest['slot']} slot)_\n\n{digest['report']}"
 
 
 @app.get("/api/traders/{name}/logs")

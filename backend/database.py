@@ -20,6 +20,24 @@ with sqlite3.connect(DB) as conn:
             message TEXT
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            datetime TEXT,
+            kind TEXT,
+            narrative TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS digests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            datetime TEXT,
+            slot TEXT,
+            report TEXT
+        )
+    ''')
     conn.commit()
 
 def write_account(name, account_dict):
@@ -58,6 +76,60 @@ def write_log(name: str, type: str, message: str):
             VALUES (?, datetime('now'), ?, ?)
         ''', (name.lower(), type, message))
         conn.commit()
+
+def write_session(name: str, kind: str, narrative: list[dict]) -> None:
+    """Record one trading round's step-by-step narrative (tool calls, their results, and
+
+    the model's own messages), for later compilation into a digest.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO sessions (name, datetime, kind, narrative)
+            VALUES (?, ?, ?, ?)
+        ''', (name.lower(), timestamp, kind, json.dumps(narrative)))
+        conn.commit()
+
+
+def read_sessions_since(name: str, since: str) -> list[dict]:
+    """All recorded rounds for this trader at or after the given 'YYYY-MM-DD HH:MM:SS' timestamp."""
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT datetime, kind, narrative FROM sessions
+            WHERE name = ? AND datetime >= ?
+            ORDER BY datetime ASC
+        ''', (name.lower(), since))
+        return [
+            {"datetime": row[0], "kind": row[1], "narrative": json.loads(row[2])}
+            for row in cursor.fetchall()
+        ]
+
+
+def write_digest(name: str, slot: str, report: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO digests (name, datetime, slot, report)
+            VALUES (?, ?, ?, ?)
+        ''', (name.lower(), timestamp, slot, report))
+        conn.commit()
+
+
+def read_latest_digest(name: str) -> dict | None:
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT datetime, slot, report FROM digests
+            WHERE name = ?
+            ORDER BY datetime DESC
+            LIMIT 1
+        ''', (name.lower(),))
+        row = cursor.fetchone()
+        return {"datetime": row[0], "slot": row[1], "report": row[2]} if row else None
+
 
 def read_log(name: str, last_n=10):
     """
