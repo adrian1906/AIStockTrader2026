@@ -38,6 +38,15 @@ If a live price genuinely can't be fetched, `get_share_price` raises `MarketData
 than silently substituting a simulated value — a failed trade is preferable to a trade or account
 report built on fabricated data.
 
+## Trading mechanics
+
+Every buy or sell in `backend/accounts.py` applies a simulated 0.2% bid-ask spread (`SPREAD`):
+buys execute at `price * 1.002`, sells at `price * 0.998`. This models a real transaction cost, so
+a position shows a small unrealized loss the instant it's opened, before the market moves at all -
+that's expected, not a bug. It applies regardless of whether the market is open; trades placed while
+closed (e.g. via `run_once.py`) execute against the last available price (previous close) with the
+same spread.
+
 ## Setup
 
 1. Install dependencies (Python 3.11+):
@@ -51,6 +60,7 @@ report built on fabricated data.
 
    ```
    OPENAI_API_KEY=...          # for the default gpt-5.4-mini traders
+   OPENAI_ADMIN_KEY=...        # optional, for check_openai_cost.py (org Admin key, not a project key)
    DEEPSEEK_API_KEY=...        # optional, for USE_MANY_MODELS=true
    GOOGLE_API_KEY=...          # optional, for USE_MANY_MODELS=true
    GROK_API_KEY=...            # optional, for USE_MANY_MODELS=true
