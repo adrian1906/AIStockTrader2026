@@ -11,14 +11,32 @@ of raw JSON. A cheap model turns it into a few actual paragraphs: what was consu
 was read, and what was decided (including an explicit "chose not to trade" and why).
 """
 
+import re
 from datetime import datetime
 
 from openai import AsyncOpenAI
 
 from .database import read_latest_digest, read_sessions_since, write_digest
 from .trading_floor import names
+from .traders import IMAGE_EXTENSIONS
 
 DIGEST_MODEL = "gpt-5.4-mini"
+
+# The prompt asks the model to skip image/icon URLs, but instruction-following on a list of
+# dozens of URLs isn't perfectly reliable - this deterministically drops any that slip through
+# a line consisting of just a (optionally bulleted) URL, which is how the model lists references.
+_URL_LINE_PATTERN = re.compile(r"^[ \t]*[-*]?[ \t]*(https?://\S+)[ \t]*$", re.MULTILINE)
+
+
+def _strip_image_reference_lines(text: str) -> str:
+    def _keep_unless_image(match: re.Match) -> str:
+        url = match.group(1).rstrip(".,;:)]}\"'")
+        if url.split("?", 1)[0].lower().endswith(IMAGE_EXTENSIONS):
+            return ""
+        return match.group(0)
+
+    cleaned = _URL_LINE_PATTERN.sub(_keep_unless_image, text)
+    return re.sub(r"\n{3,}", "\n\n", cleaned)
 
 SUMMARY_SYSTEM_PROMPT = """You summarize a trading agent's activity for the person overseeing it, \
 who wants to understand the agent's process, not just its outcome. You'll be given a raw record of \
@@ -30,7 +48,16 @@ are several: what sources or data the agent consulted and what it found, how it 
 information, and what action it took - including an explicit "chose not to trade" with its stated \
 reasoning, if that's what happened. Stay strictly grounded in the record: never invent numbers, \
 sources, or reasoning that isn't actually there. Write for a reader with no context on the raw log \
-format - they just want to know what the agent actually did and why."""
+format - they just want to know what the agent actually did and why.
+
+Some entries include a "Sources consulted:" list of URLs the agent actually fetched or that turned \
+up in its search results - these are real, not to be altered. Skip any URL that's clearly an image, \
+icon, logo, or thumbnail asset rather than an actual page (e.g. ending in .png/.jpg/.jpeg/.gif/.svg/ \
+.ico, or with "icon"/"logo"/"thumb" in the path) - it's not a source, just embedded page furniture. \
+Where a specific claim in your summary \
+draws on one of them, cite it inline as a plain URL in parentheses right after the claim. Then end \
+with a "References" section listing every URL from the record, deduplicated. If a round has no \
+source URLs, skip citations for it - do not fabricate a URL to fill the gap."""
 
 
 def _render_step(step: dict) -> str:
@@ -70,8 +97,9 @@ async def summarize_narrative(name: str, raw_narrative: str) -> str:
             {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
             {"role": "user", "content": f"Trader: {name}\n\n{raw_narrative}"},
         ],
+        max_completion_tokens=3000,
     )
-    return response.choices[0].message.content
+    return _strip_image_reference_lines(response.choices[0].message.content)
 
 
 async def compile_and_store_digest(slot: str) -> None:

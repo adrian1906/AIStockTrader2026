@@ -4,10 +4,12 @@ from .database import write_session
 from .tracers import make_trace_id
 from agents import Agent, ItemHelpers, Tool, Runner, OpenAIChatCompletionsModel, trace
 from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
+from agents.result import RunResult
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
 import json
+import re
 from .templates import (
     researcher_instructions,
     trader_instructions,
@@ -17,7 +19,9 @@ from .templates import (
 )
 from .mcp_servers import trader_mcp_servers, researcher_mcp_servers
 
-NARRATIVE_STEP_CHARS = 1500
+NARRATIVE_STEP_CHARS = 4000
+URL_PATTERN = re.compile(r"https?://\S+")
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico")
 
 
 def _summarize(output) -> str:
@@ -25,6 +29,45 @@ def _summarize(output) -> str:
     text = text.strip()
     if len(text) > NARRATIVE_STEP_CHARS:
         text = text[:NARRATIVE_STEP_CHARS] + "... (truncated)"
+    return text
+
+
+async def _extract_researcher_output(result: RunResult) -> str:
+    """The Researcher's final answer, plus the real URLs it actually consulted (from
+
+    tavily_search results and fetch calls) - so downstream summaries can cite grounded
+    sources instead of inventing them.
+    """
+    text = result.final_output if isinstance(result.final_output, str) else str(result.final_output)
+    urls: list[str] = []
+    for item in result.new_items:
+        if isinstance(item, ToolCallItem) and getattr(item.raw_item, "name", None) == "fetch":
+            try:
+                args = json.loads(getattr(item.raw_item, "arguments", "") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            if args.get("url"):
+                urls.append(args["url"])
+        elif isinstance(item, ToolCallOutputItem):
+            output = item.output if isinstance(item.output, str) else json.dumps(item.output, default=str)
+            urls.extend(URL_PATTERN.findall(output))
+
+    seen: set[str] = set()
+    deduped = []
+    for url in urls:
+        # Tool output is JSON-serialized text, so a "newline" in it is the literal two
+        # characters "\n", not a real newline - \S+ doesn't stop there, so cut manually
+        # at the first real whitespace or literal backslash before trimming punctuation.
+        url = re.split(r"[\s\\]", url)[0]
+        url = url.rstrip(".,;:)]}\"'")
+        if url.split("?", 1)[0].lower().endswith(IMAGE_EXTENSIONS):
+            continue
+        if url not in seen:
+            seen.add(url)
+            deduped.append(url)
+
+    if deduped:
+        text += "\n\nSources consulted:\n" + "\n".join(f"- {url}" for url in deduped)
     return text
 
 
@@ -95,7 +138,11 @@ async def get_researcher(mcp_servers, model_name) -> Agent:
 
 async def get_researcher_tool(mcp_servers, model_name) -> Tool:
     researcher = await get_researcher(mcp_servers, model_name)
-    return researcher.as_tool(tool_name="Researcher", tool_description=research_tool())
+    return researcher.as_tool(
+        tool_name="Researcher",
+        tool_description=research_tool(),
+        custom_output_extractor=_extract_researcher_output,
+    )
 
 
 class Trader:
