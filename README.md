@@ -68,8 +68,6 @@ same spread.
    OPENROUTER_API_KEY=...      # optional, for openrouter-routed models
 
    MASSIVE_API_KEY=...         # optional; omit to run on simulated prices
-   PUSHOVER_USER=...           # optional, for push notifications
-   PUSHOVER_TOKEN=...          # optional, for push notifications
 
    RUN_EVERY_N_MINUTES=240              # optional, default 240 - each round already weighs "do nothing"
    RUN_EVEN_WHEN_MARKET_IS_CLOSED=false # optional

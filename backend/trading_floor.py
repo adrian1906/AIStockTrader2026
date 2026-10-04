@@ -2,15 +2,13 @@ from .traders import Trader
 from typing import List
 import asyncio
 from datetime import datetime
-from .tracers import LogTracer
-from agents import add_trace_processor
 from .market import is_market_open
 from dotenv import load_dotenv
 import os
 
 load_dotenv(override=True)
 
-RUN_EVERY_N_MINUTES = int(os.getenv("RUN_EVERY_N_MINUTES", "60"))
+RUN_EVERY_N_MINUTES = int(os.getenv("RUN_EVERY_N_MINUTES", "240"))
 RUN_EVEN_WHEN_MARKET_IS_CLOSED = (
     os.getenv("RUN_EVEN_WHEN_MARKET_IS_CLOSED", "false").strip().lower() == "true"
 )
@@ -61,7 +59,6 @@ def _due_digest_slots(last_sent: dict[str, str]) -> list[str]:
 async def run_every_n_minutes():
     from .digest import compile_and_store_digest
 
-    add_trace_processor(LogTracer())
     traders = create_traders()
     last_digest_sent: dict[str, str] = {}
     while True:

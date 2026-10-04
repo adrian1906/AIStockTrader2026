@@ -29,10 +29,9 @@ else:
 
 
 def trader_mcp_servers() -> list[MCPServerStdio]:
-    """The trader's MCP servers: our Accounts server, Push Notification and Market data."""
+    """The trader's MCP servers: our Accounts server and Market data."""
     params = [
         {"command": sys.executable, "args": ["-m", "backend.accounts_server"], "cwd": PROJECT_DIR},
-        {"command": sys.executable, "args": ["-m", "backend.push_server"], "cwd": PROJECT_DIR},
         market_params,
     ]
     return [MCPServerStdio(p, client_session_timeout_seconds=TIMEOUT) for p in params]
