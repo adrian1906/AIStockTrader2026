@@ -43,44 +43,38 @@ You can use your entity tools as a persistent memory to store and recall informa
 building up your own knowledge over time.
 Review how your past trades have actually performed, and update your strategy to reflect those lessons so your decisions keep improving over time; you have a tool to change your strategy whenever you wish.
 Use these tools to carry out research, make decisions, and execute trades.
-After you've completed trading, send a push notification with a brief summary of activity, then reply with a 2-3 sentence appraisal.
+
+Every trade pays a real cost - a bid-ask spread on both the buy and the sell - so trading is not free, and doing
+nothing is frequently the correct decision. Only act when you have a genuine, well-reasoned edge consistent with
+your strategy. Do not reopen, reverse, or undo a position you took earlier the same day without a real new
+catalyst; reconsidering the same decision hour after hour without new information is how a strategy bleeds to
+transaction costs, not how it improves.
+
+After you've completed your review, reply with a 2-3 sentence appraisal of your activity, including if you
+decided not to trade.
 Your goal is to maximize your profits according to your strategy.
 """
 
-def trade_message(name, strategy, account):
-    return f"""Based on your investment strategy, you should now look for new opportunities.
-Use the research tool to find news and opportunities consistent with your strategy.
+def round_message(name, strategy, account):
+    return f"""Based on your investment strategy, review your account and decide what to do this round.
+Use the research tool to find news and opportunities consistent with your strategy - both for new positions and
+for anything affecting what you already hold.
 Do not use the 'get company news' tool; use the research tool instead.
 Use the tools to research stock price and other company information. {note}
-Finally, make your decision, then execute trades using the tools.
 Your tools only allow you to trade equities, but you are able to use ETFs to take positions in other markets.
-You do not need to rebalance your portfolio; you will be asked to do so later.
-Just make trades based on your strategy as needed.
-Your investment strategy:
-{strategy}
-Here is your current account:
-{account}
-Here is the current datetime:
-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-Now, carry out analysis, make your decision and execute trades. Your account name is {name}.
-After you've executed your trades, send a push notification with a brief summary of trades and the health of the portfolio, then
-respond with a brief 2-3 sentence appraisal of your portfolio and its outlook.
-"""
 
-def rebalance_message(name, strategy, account):
-    return f"""Based on your investment strategy, you should now examine your portfolio and decide if you need to rebalance.
-Use the research tool to find news and opportunities affecting your existing portfolio.
-Use the tools to research stock price and other company information affecting your existing portfolio. {note}
-Finally, make your decision, then execute trades using the tools as needed.
-You do not need to identify new investment opportunities at this time; you will be asked to do so later.
-Just rebalance your portfolio based on your strategy as needed.
+Holding everything as-is, including doing nothing at all this round, is a completely valid outcome - you do not
+need to trade simply because you are able to. Weigh a new position, an adjustment to an existing one, and no
+action at all on equal footing, and pick whichever your strategy and the actual evidence support. You also have
+a tool to change your strategy - if your past trades have taught you something real, fold that lesson in.
+
 Your investment strategy:
 {strategy}
-You also have a tool to change your strategy. Look at how your holdings have actually performed and fold those lessons into your strategy so it improves over time; you can evolve or even switch it whenever you wish.
 Here is your current account:
 {account}
 Here is the current datetime:
 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-Now, carry out analysis, make your decision and execute trades. Your account name is {name}.
-After you've executed your trades, send a push notification with a brief summary of trades and the health of the portfolio, then
-respond with a brief 2-3 sentence appraisal of your portfolio and its outlook."""
+Now, carry out analysis and decide - trade only if the evidence genuinely calls for it. Your account name is {name}.
+After you're done, respond with a brief 2-3 sentence appraisal of your portfolio and its outlook, including
+"no trade" if that was the outcome.
+"""

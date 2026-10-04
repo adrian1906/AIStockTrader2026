@@ -80,7 +80,7 @@ def _render_raw_narrative(name: str, since: str) -> tuple[str, int]:
     sessions = read_sessions_since(name, since)
     lines = []
     for session in sessions:
-        lines.append(f"## Round at {session['datetime']} ({session['kind']})")
+        lines.append(f"## Round at {session['datetime']}")
         for step in session["narrative"]:
             rendered = _render_step(step)
             if rendered:

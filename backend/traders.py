@@ -1,6 +1,6 @@
 from contextlib import AsyncExitStack
 from .accounts_client import read_accounts_resource, read_strategy_resource
-from .database import write_session
+from .database import write_log, write_session
 from .tracers import make_trace_id
 from agents import Agent, ItemHelpers, Tool, Runner, OpenAIChatCompletionsModel, trace
 from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 import os
 import json
 import re
+import traceback
 from .templates import (
     researcher_instructions,
     trader_instructions,
-    trade_message,
-    rebalance_message,
+    round_message,
     research_tool,
 )
 from .mcp_servers import trader_mcp_servers, researcher_mcp_servers
@@ -151,7 +151,6 @@ class Trader:
         self.lastname = lastname
         self.agent = None
         self.model_name = model_name
-        self.do_trade = True
 
     async def create_agent(self, trader_mcp_servers, researcher_mcp_servers) -> Agent:
         tool = await get_researcher_tool(researcher_mcp_servers, self.model_name)
@@ -174,13 +173,9 @@ class Trader:
         self.agent = await self.create_agent(trader_mcp_servers, researcher_mcp_servers)
         account = await self.get_account_report()
         strategy = await read_strategy_resource(self.name)
-        message = (
-            trade_message(self.name, strategy, account)
-            if self.do_trade
-            else rebalance_message(self.name, strategy, account)
-        )
+        message = round_message(self.name, strategy, account)
         result = await Runner.run(self.agent, message, max_turns=MAX_TURNS)
-        record_session(self.name, "trade" if self.do_trade else "rebalance", result)
+        record_session(self.name, "round", result)
 
     async def run_with_mcp_servers(self):
         async with AsyncExitStack() as stack:
@@ -194,7 +189,7 @@ class Trader:
             await self.run_agent(trader_servers, researcher_servers)
 
     async def run_with_trace(self):
-        trace_name = f"{self.name}-trading" if self.do_trade else f"{self.name}-rebalancing"
+        trace_name = f"{self.name}-round"
         trace_id = make_trace_id(f"{self.name.lower()}")
         with trace(trace_name, trace_id=trace_id):
             await self.run_with_mcp_servers()
@@ -203,5 +198,8 @@ class Trader:
         try:
             await self.run_with_trace()
         except Exception as e:
+            # print() is useless here in the long-running scheduler process: stdout is
+            # fully buffered and this process never exits to flush it, so the error would
+            # otherwise vanish. write_log commits immediately, so it survives regardless.
+            write_log(self.name, "error", f"{e}\n{traceback.format_exc()}")
             print(f"Error running trader {self.name}: {e}")
-        self.do_trade = not self.do_trade
