@@ -1,16 +1,24 @@
-"""Print OpenAI API spend for this org, using the Costs API.
+"""Print OpenAI API spend, using the Costs API.
 
 Needs an Admin API key - not the regular OPENAI_API_KEY used for trading,
 which can't read billing data. Create one at platform.openai.com under
 Settings -> Organization -> Admin keys (needs the api.usage.read scope,
 org owner/admin role required), then add it to .env as OPENAI_ADMIN_KEY.
 
+An Admin key sees the whole org, not just this app - if other apps share
+the same OpenAI org, set OPENAI_PROJECT_ID in .env (the "proj_..." id from
+the project this app's own OPENAI_API_KEY belongs to) to scope results to
+just this project's spend. Without it, this reports org-wide spend, which
+is misleading once more than one app shares the org.
+
 OpenAI's API reports spend, not your remaining prepaid balance - compare
 the total this prints against what you've deposited to know when to top up.
 
 Usage:
-    python check_openai_cost.py                # this month so far
+    python check_openai_cost.py                # this month so far, this project
     python check_openai_cost.py --since 2026-09-01
+    python check_openai_cost.py --project proj_abc123  # override OPENAI_PROJECT_ID
+    python check_openai_cost.py --org-wide      # ignore project scoping entirely
 """
 
 import argparse
@@ -24,6 +32,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 ADMIN_KEY = os.getenv("OPENAI_ADMIN_KEY")
+DEFAULT_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID")
 COSTS_URL = "https://api.openai.com/v1/organization/costs"
 
 
@@ -36,12 +45,14 @@ def date_to_unix(date_str: str) -> int:
     return int(datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
 
 
-def fetch_cost_buckets(start_time: int) -> list[dict]:
+def fetch_cost_buckets(start_time: int, project_id: str | None) -> list[dict]:
     headers = {"Authorization": f"Bearer {ADMIN_KEY}"}
     buckets = []
     page = None
     while True:
         params = {"start_time": start_time, "bucket_width": "1d", "limit": 180}
+        if project_id:
+            params["project_ids"] = [project_id]
         if page:
             params["page"] = page
         response = requests.get(COSTS_URL, headers=headers, params=params, timeout=30)
@@ -65,11 +76,17 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--since", help="YYYY-MM-DD, defaults to the start of this month")
+    parser.add_argument("--project", help="Project id (proj_...) to scope to; overrides OPENAI_PROJECT_ID")
+    parser.add_argument("--org-wide", action="store_true", help="Report org-wide spend, ignoring project scoping")
     args = parser.parse_args()
 
-    start_time = date_to_unix(args.since) if args.since else month_start_unix()
-    buckets = fetch_cost_buckets(start_time)
+    project_id = None if args.org_wide else (args.project or DEFAULT_PROJECT_ID)
 
+    start_time = date_to_unix(args.since) if args.since else month_start_unix()
+    buckets = fetch_cost_buckets(start_time, project_id)
+
+    scope = f"project {project_id}" if project_id else "entire org"
+    print(f"Scope: {scope}\n")
     total = 0.0
     print(f"{'Date':<12} {'Cost (USD)':>10}")
     for bucket in buckets:

@@ -61,6 +61,7 @@ same spread.
    ```
    OPENAI_API_KEY=...          # for the default gpt-5.4-mini traders
    OPENAI_ADMIN_KEY=...        # optional, for check_openai_cost.py (org Admin key, not a project key)
+   OPENAI_PROJECT_ID=...       # optional, scopes check_openai_cost.py to this app's project if others share the org
    DEEPSEEK_API_KEY=...        # optional, for USE_MANY_MODELS=true
    GOOGLE_API_KEY=...          # optional, for USE_MANY_MODELS=true
    GROK_API_KEY=...            # optional, for USE_MANY_MODELS=true
@@ -70,7 +71,7 @@ same spread.
    PUSHOVER_USER=...           # optional, for push notifications
    PUSHOVER_TOKEN=...          # optional, for push notifications
 
-   RUN_EVERY_N_MINUTES=60               # optional, default 60
+   RUN_EVERY_N_MINUTES=240              # optional, default 240 - each round already weighs "do nothing"
    RUN_EVEN_WHEN_MARKET_IS_CLOSED=false # optional
    DIGEST_TIMES=08:00,12:00,17:00       # optional, default 08:00,12:00,17:00 - see GET /api/traders/{name}/digest
    USE_MANY_MODELS=false                # optional, spreads traders across 4 different models
